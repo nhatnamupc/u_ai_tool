@@ -13,8 +13,8 @@ from rembg import remove
 join = os.path.join
 basename = os.path.basename
 ROOT = r"\\192.168.0.241\nam\yakult_project"
-ROOT1=r"/home/upc/WorkSpaces/nam/yakult_project/"
-IMAGE_PROCESS_PATH = r"\\192.168.0.241\nam\yakult_project\images_processed"
+ROOT1 = r"/home/upc/WorkSpaces/nam/yakult_project/"
+IMAGE_PROCESS_PATH = r"/home/upc/WorkSpaces/nam/yakult_project/images_processed"
 
 
 def get_all_file(path_dir):  # Get all file and folder with links from path_dir w
@@ -73,33 +73,35 @@ def w_h_image_rotate(image):
     return x, y, (x + w), (y + h)
 
 
-def cut_from_removed_background(image, save_path=None):
-    im = cv2.imread(image, cv2.IMREAD_UNCHANGED)
-    im_to_crop = cv2.imread(image, cv2.IMREAD_UNCHANGED)
+def cut_from_removed_background(src_, save_path=None):
+    files_, _ = get_all_file(src_)
+    for image in files_:
+        im = cv2.imread(image, cv2.IMREAD_UNCHANGED)
+        im_to_crop = cv2.imread(image, cv2.IMREAD_UNCHANGED)
 
-    alpha_channel = im[:, :, 3]
-    rgb_channel = im[:, :, :3]
-    white_background = np.ones_like(rgb_channel, dtype=np.uint8) * 255
+        alpha_channel = im[:, :, 3]
+        rgb_channel = im[:, :, :3]
+        white_background = np.ones_like(rgb_channel, dtype=np.uint8) * 255
 
-    alpha_factor = alpha_channel[:, :, np.newaxis].astype(np.float32) / 255.0
-    alpha_factor = np.concatenate((alpha_factor, alpha_factor, alpha_factor), axis=2)
+        alpha_factor = alpha_channel[:, :, np.newaxis].astype(np.float32) / 255.0
+        alpha_factor = np.concatenate((alpha_factor, alpha_factor, alpha_factor), axis=2)
 
-    base = rgb_channel.astype(np.float32) * alpha_factor
-    white = white_background.astype(np.float32) * (1 - alpha_factor)
-    final_im = base + white
-    final_im = final_im.astype(np.uint8)
+        base = rgb_channel.astype(np.float32) * alpha_factor
+        white = white_background.astype(np.float32) * (1 - alpha_factor)
+        final_im = base + white
+        final_im = final_im.astype(np.uint8)
 
-    gray = cv2.cvtColor(final_im, cv2.COLOR_BGR2GRAY)
-    r1, t1 = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
-    # t1=cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,11,2)
-    c1, h1 = cv2.findContours(t1, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        gray = cv2.cvtColor(final_im, cv2.COLOR_BGR2GRAY)
+        r1, t1 = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
+        # t1=cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,11,2)
+        c1, h1 = cv2.findContours(t1, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-    cnt = sorted(c1, key=cv2.contourArea, reverse=True)
-    x, y, w, h = cv2.boundingRect(cnt[0])
-    crop = im_to_crop[y:y + h, x:x + w]
-    cv2.imwrite(save_path, crop)
+        cnt = sorted(c1, key=cv2.contourArea, reverse=True)
+        x, y, w, h = cv2.boundingRect(cnt[0])
+        crop = im_to_crop[y:y + h, x:x + w]
+        cv2.imwrite(join(save_path,basename(image)), crop)
 
-    # if resize_value1 > 0:
+        # if resize_value1 > 0:
     #     crop_rz_1 = cv2.resize(crop, (0, 0), fx=resize_value1, fy=resize_value1)
     #     cv2.imwrite(save[:-4] + '-' + str(resize_value1) + PNG, crop_rz_1)
     #
@@ -160,10 +162,8 @@ def merge(path_background, path_foreground, annotation_num, save_path, rotate=Fa
                 dictionary[id_] = [1, 0]
             else:
                 if dictionary[id_][0] > annotation_num:
-                    print(f"{id_} finnish")
                     foregrounds.remove(fg)
                     continue
-                dictionary[id_][0] += 1
             fore_image = Image.open(fg).convert("RGBA")
             if rotate:
                 if dictionary[id_][1] > 359:
@@ -212,23 +212,23 @@ def merge(path_background, path_foreground, annotation_num, save_path, rotate=Fa
         idx += 1
 
 
-def get_frames(src: str, save_, value=10):
-    if src.endswith("png"):
-        folder_id = join(save_, class_id(basename(src)))
+def get_frames(src_: str, save_, value=10):
+    if src_.endswith("png"):
+        folder_id = join(save_, class_id(basename(src_)))
         os.makedirs(folder_id, exist_ok=True)
-        old, new = src, join(folder_id, basename(src))
+        old, new = src_, join(folder_id, basename(src_))
         shutil.copy(old, new)
-    elif src.endswith("mp4") or src.endswith("avi"):
-        cap = cv2.VideoCapture(src)
+    elif src_.endswith("mp4") or src_.endswith("avi"):
+        cap = cv2.VideoCapture(src_)
         stt, index = 1, 0
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
-            folder_id = join(save_, class_id(basename(src)))
+            folder_id = join(save_, class_id(basename(src_)))
             os.makedirs(folder_id, exist_ok=True)
             if index % value == 0:
-                cv2.imwrite(join(folder_id, basename(src)[:-4] + f"{stt}.png"), frame)
+                cv2.imwrite(join(folder_id, basename(src_)[:-4] + f"{stt}.png"), frame)
             stt += 1
             index += 1
 
@@ -281,32 +281,44 @@ def remove_background_thread(src, save_):
 
 
 # Get Frame
-# files, _ = get_all_file(r"C:\NAM\GIT\upc_yolov5_dataset_creator\image_process\video\yakult\2\2_03")
-# save = join(ROOT, "images_processed", "side_process", "backside","extracted")
+# files, _ = get_all_file(join(ROOT1, "images_processed", "side_process", "backside", "video"))
+# save = join(ROOT1, "images_processed", "side_process", "backside","extracted")
 # for f in files:
 #     get_frames(f, save, value=10)
 
 # Remove background
-files, _ = get_all_file(join(ROOT1, "images_processed", "side_process", "backside", "extracted"))
+# files, _ = get_all_file(join(ROOT1, "images_processed", "side_process", "backside", "extracted"))
+#
+# save = join(ROOT1, "images_processed", "side_process", "backside", "removed")
+# for f in os.listdir(join(ROOT1, "images_processed", "side_process", "backside", "extracted")):
+#     # remove_background_thread(f,save)
+#     if f in ["13"]:
+#         t = threading.Thread(target=remove_background_thread, args=[join(ROOT1, "images_processed", "side_process", "backside", "extracted",f), save])
+#         t.start()
+#
 
-save = join(ROOT1, "images_processed", "side_process", "backside", "removed")
-for f in os.listdir(join(ROOT1, "images_processed", "side_process", "backside", "extracted")):
-    # remove_background_thread(f,save)
-    t = threading.Thread(target=remove_background_thread, args=[join(ROOT1, "images_processed", "side_process", "backside", "extracted",f), save])
-    t.start()
+# Cut and process
+#
+# save = join(ROOT1, "images_processed", "side_process", "backside", "processed")
+# src = join(ROOT1, "images_processed", "side_process", "backside", "removed")
+# for f in os.listdir(src):
+#     if f in ["13"]:
+#         t = threading.Thread(target=cut_from_removed_background,
+#                              args=[join(ROOT1, "images_processed", "side_process", "backside", "removed", f), save])
+#         t.start()
 
 # Merge function
 # SAVE_PATH = r"\\192.168.0.241\nam\yakult_project\images_processed\top_removed"
 
 # images, _ = get_all_file(join(IMAGE_PROCESS_PATH, "1"))
-# save = join(IMAGE_PROCESS_PATH, "top_process", "merged")
-# fore_path = join(IMAGE_PROCESS_PATH, "top_process", "top_crop")
-# back_path = join(IMAGE_PROCESS_PATH, "background")
+save = join(IMAGE_PROCESS_PATH,"side_process", "backside","merged")
+fore_path = join(IMAGE_PROCESS_PATH, "side_process", "backside","processed")
+back_path = join(IMAGE_PROCESS_PATH, "background")
 
 # for index in range(0, 50, 5):
 #     t = threading.Thread(target=merge, args=[back_path, fore_path, 5, save, index])
 #     t.start()
-# merge(back_path, fore_path, 100, save, rotate=True, filename="merged_stop")
+merge(back_path, fore_path, 100, save, rotate=False, filename="merged_backside")
 # count_annotation(save, "../utils/name.txt", write_to_csv=True)
 
 # for img in images:
