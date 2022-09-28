@@ -13,6 +13,7 @@ from rembg import remove
 join = os.path.join
 basename = os.path.basename
 ROOT = r"\\192.168.0.241\nam\yakult_project"
+ROOT1=r"/home/upc/WorkSpaces/nam/yakult_project/"
 IMAGE_PROCESS_PATH = r"\\192.168.0.241\nam\yakult_project\images_processed"
 
 
@@ -272,25 +273,27 @@ def count_annotation(path_txt, file_classes_name, write_to_csv=False):
 
 
 def remove_background_thread(src, save_):
-    save_f = join(save_, class_id(basename(src)))
-    os.makedirs(save_f, exist_ok=True)
-    remove_background(src, join(save_f, basename(src)))
+    files_, _ = get_all_file(src)
+    for img in files_:
+        save_f = join(save_, class_id(basename(img)))
+        os.makedirs(save_f, exist_ok=True)
+        remove_background(img, join(save_f, basename(img)))
 
 
 # Get Frame
 # files, _ = get_all_file(r"C:\NAM\GIT\upc_yolov5_dataset_creator\image_process\video\yakult\2\2_03")
-# save = join(ROOT, "images_processed", "side_process", "backside")
+# save = join(ROOT, "images_processed", "side_process", "backside","extracted")
 # for f in files:
 #     get_frames(f, save, value=10)
 
 # Remove background
-files, _ = get_all_file(join(ROOT, "images_processed", "side_process", "backside", "extracted"))
+files, _ = get_all_file(join(ROOT1, "images_processed", "side_process", "backside", "extracted"))
 
-save = join(ROOT, "images_processed", "side_process", "backside", "removed")
-for f in files:
-    remove_background_thread(f,save)
-    # t = threading.Thread(target=remove_background_thread, args=[f, save])
-    # t.start()
+save = join(ROOT1, "images_processed", "side_process", "backside", "removed")
+for f in os.listdir(join(ROOT1, "images_processed", "side_process", "backside", "extracted")):
+    # remove_background_thread(f,save)
+    t = threading.Thread(target=remove_background_thread, args=[join(ROOT1, "images_processed", "side_process", "backside", "extracted",f), save])
+    t.start()
 
 # Merge function
 # SAVE_PATH = r"\\192.168.0.241\nam\yakult_project\images_processed\top_removed"
