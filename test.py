@@ -9,8 +9,9 @@ ROOT = r"\\192.168.0.241\nam\yakult_project\Dataset\dataset_20220921"
 labels = join(ROOT, "side", "labels")
 txt, _ = general.get_all_file(labels)
 #
-old_cls_side = [-99, -1, -2, -3, 3, 4, 25, 26, 28, 29, 31, 32, 34, 21, 23, 7, 10, 13, 16, 19, 73, 74, 75, 76, 77, 78, 79,
-                80, 81, 82, 83, 84, 85, 86, 87, 88, -4, 1, 42, 43, 44, 20, 22, 40, 41, 45, 34, -5, -6, -7, -8, -9, -10,
+old_cls_side = [-99, -1, -2, -3, 3, 4, 25, 26, 28, 29, 31, 32, 34, 21, 23, 7, 10, 13, 16, 19, 73, 74, 75, 76, 77, 78,
+                79,
+                80, 81, 82, 83, 84, 85, 86, 87, 88, -4, 1, 42, 43, 44, 20, 22, 40, 41, 45, 33, -5, -6, -7, -8, -9, -10,
                 -11, -12, -13, -14, -15, -16, 47]
 
 old_cls_top = [0, 42, 43, 44, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18, 20, 22, 40, 41, 45, 33, 24, 25, 27, 28, 30, 31,
@@ -22,7 +23,8 @@ change_cls = {}
 for index, cls in enumerate(old_cls_side):
     change_cls[str(cls)] = index
 #
-
+txts = []
+pngs = []
 # for file in txt:
 #     if file.endswith("txt"):
 #         with open(file, "r", encoding="utf-8") as f:
@@ -31,6 +33,8 @@ for index, cls in enumerate(old_cls_side):
 #             for text in data:
 #                 texts = text.split(" ")
 #                 if int(texts[0]) == 46:
+#                     # txts.append(file)
+#                     # pngs.append(file[:-4])
 #                     new_line = f"{59} {texts[1]} {texts[2]} {texts[3]} {texts[4]}"
 #                     f1.writelines(new_line)
 #                     f1.writelines("\n")
