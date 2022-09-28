@@ -10,6 +10,11 @@ import csv
 
 from rembg import remove
 
+join = os.path.join
+basename = os.path.basename
+ROOT = r"\\192.168.0.241\nam\yakult_project"
+IMAGE_PROCESS_PATH = r"\\192.168.0.241\nam\yakult_project\images_processed"
+
 
 def get_all_file(path_dir):  # Get all file and folder with links from path_dir w
     file_list, dir_list = [], []
@@ -206,6 +211,27 @@ def merge(path_background, path_foreground, annotation_num, save_path, rotate=Fa
         idx += 1
 
 
+def get_frames(src: str, save_, value=10):
+    if src.endswith("png"):
+        folder_id = join(save_, class_id(basename(src)))
+        os.makedirs(folder_id, exist_ok=True)
+        old, new = src, join(folder_id, basename(src))
+        shutil.copy(old, new)
+    elif src.endswith("mp4") or src.endswith("avi"):
+        cap = cv2.VideoCapture(src)
+        stt, index = 1, 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            folder_id = join(save_, class_id(basename(src)))
+            os.makedirs(folder_id, exist_ok=True)
+            if index % value == 0:
+                cv2.imwrite(join(folder_id, basename(src)[:-4] + f"{stt}.png"), frame)
+            stt += 1
+            index += 1
+
+
 def count_annotation(path_txt, file_classes_name, write_to_csv=False):
     annotation_dic = {}
     f_name = open(file_classes_name, 'r')
@@ -245,21 +271,40 @@ def count_annotation(path_txt, file_classes_name, write_to_csv=False):
                 writer.writerow(data)
 
 
-join = os.path.join
-basename = os.path.basename
-ROOT = r"\\192.168.0.241\nam\yakult_project"
-IMAGE_PROCESS_PATH = r"\\192.168.0.241\nam\yakult_project\images_processed"
+def remove_background_thread(src, save_):
+    save_f = join(save_, class_id(basename(src)))
+    os.makedirs(save_f, exist_ok=True)
+    remove_background(src, join(save_f, basename(src)))
 
-SAVE_PATH = r"\\192.168.0.241\nam\yakult_project\images_processed\top_removed"
-images, _ = get_all_file(join(IMAGE_PROCESS_PATH, "1"))
-save = join(IMAGE_PROCESS_PATH, "top_process", "merged")
-fore_path = join(IMAGE_PROCESS_PATH, "top_process", "top_crop")
-back_path = join(IMAGE_PROCESS_PATH, "background")
+
+# Get Frame
+# files, _ = get_all_file(r"C:\NAM\GIT\upc_yolov5_dataset_creator\image_process\video\yakult\2\2_03")
+# save = join(ROOT, "images_processed", "side_process", "backside")
+# for f in files:
+#     get_frames(f, save, value=10)
+
+# Remove background
+files, _ = get_all_file(join(ROOT, "images_processed", "side_process", "backside", "extracted"))
+
+save = join(ROOT, "images_processed", "side_process", "backside", "removed")
+for f in files:
+    remove_background_thread(f,save)
+    # t = threading.Thread(target=remove_background_thread, args=[f, save])
+    # t.start()
+
+# Merge function
+# SAVE_PATH = r"\\192.168.0.241\nam\yakult_project\images_processed\top_removed"
+
+# images, _ = get_all_file(join(IMAGE_PROCESS_PATH, "1"))
+# save = join(IMAGE_PROCESS_PATH, "top_process", "merged")
+# fore_path = join(IMAGE_PROCESS_PATH, "top_process", "top_crop")
+# back_path = join(IMAGE_PROCESS_PATH, "background")
+
 # for index in range(0, 50, 5):
 #     t = threading.Thread(target=merge, args=[back_path, fore_path, 5, save, index])
 #     t.start()
 # merge(back_path, fore_path, 100, save, rotate=True, filename="merged_stop")
-count_annotation(save, "../utils/name.txt", write_to_csv=True)
+# count_annotation(save, "../utils/name.txt", write_to_csv=True)
 
 # for img in images:
 # t = threading.Thread(target=remove_background, args=[img, join(SAVE_PATH, basename(img))])
