@@ -1,20 +1,19 @@
-<html>
-<head>
-    <title>AI DETECT</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/style.css') }}">
-</head>
+{% extends "base.html" %}
 
-<!--Body-->
-<body>
-<!-- Navbar-->
-
-<!--Center-->
-<div>
-    <p class="intro--title">AI Generator</p>
-    <p><img src="static/styles/resource/ai.svg" style="float: right;" alt="AI"/>
-    </p>
+{% block content %}
+<div >
+    <form method="post">
+        <div class="row">
+            <div class="col-sm-4">
+                <button type="submit" class="btn-login" name="btn_control" value="btn_evolve">モデル情報</button>
+            </div>
+            <div class="col-sm-4">
+                <button type="submit" class="btn-login" name="btn_control" value="btn_add">新製品追加</button>
+            </div>
+            <div class="col-sm-4">
+                <button type="submit" class="btn-login" name="btn_control" value="btn_change">でサイン変更</button>
+            </div>
+   </div>
+    </form>
 </div>
-
-<!--Footer-->
-</body>
-</html>
+{% endblock %}

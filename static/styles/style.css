@@ -1,11 +1,85 @@
 body {
-  background-image:  url("resource/wave.svg");
+ /* background-image:  url("resource/bg1.jpg");*/
   background-repeat: no-repeat;
-  background-attachment: fixed;;
-  }
+  background-attachment: fixed;  }
 .intro--title{
   font-size:70px;
-  color: white;
+  color: black;
   text-align: center;
+}
+.divider:after,
+.divider:before {
+content: "";
+flex: 1;
+height: 1px;
+background: #eee;
+}
+.btn-primary, .btn-primary:hover, .btn-primary:active, .btn-primary:visited {
+    background-color: #458b74 !important;
+}
+.btn-login{
+                display: inline-block;
+                outline: 0;
+                border: 0;
+                margin:30px;
+                cursor: pointer;
+                transition: box-shadow 0.15s ease,transform 0.15s ease;
+                will-change: box-shadow,transform;
+                background: #FCFCFD;
+                box-shadow: 0px 2px 4px rgb(45 35 66 / 40%), 0px 7px 13px -3px rgb(45 35 66 / 30%), inset 0px -3px 0px #d6d6e7;
+                height: 100px;
+                padding: 0 32px;
+                font-size: 24px;
+                border-radius: 15px;
+                color: #36395a;
+                transition: box-shadow 0.15s ease,transform 0.15s ease;
+}
+.btn-login:hover {
+    box-shadow: 0px 4px 8px rgb(45 35 66 / 40%), 0px 7px 13px -3px rgb(45 35 66 / 30%), inset 0px -3px 0px #d6d6e7;
+    transform: translateY(-2px);
+}
+.btn-login :active{
+    box-shadow: inset 0px 3px 7px #d6d6e7;
+    transform: translateY(2px);
+}
+
+.label {
+
+font-family: 'Bitter', serif;
+font-size: 1.375rem;
+font-weight: 800;
+letter-spacing: 0.115rem;
+font-style: normal;
+text-transform: capitalize;
+color: #1e1a1a;
+background-color: #ffffff;
+border-radius: 0.6625rem;
+-webkit-border-radius: 0.7725rem;
+-moz-border-radius: 1.0625rem;
+padding: 0.3rem 0.4rem;
+border-style: none;
+border-width: 0rem;
+border-color: #EF2D56;
+-webkit-box-shadow: -0.25px 0.75px 9px -0.25px rgba(85,85,85,0.36);
+-moz-box-shadow: -0.25px 0.75px 9px -0.25px rgba(85,85,85,0.36);
+-box-shadow: -0.25px 0.75px 9px -0.25px rgba(85,85,85,0.36);
 
 }
+.container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+footer{
+
+bottom: 0;
+position:absolute;
+width: 100%;
+}
+header{
+    --bs-bg-opacity: .5;
+    height:60px;
+    background-color: rgba(var(--bs-light-rgb),var(--bs-bg-opacity))!important;
+}
+

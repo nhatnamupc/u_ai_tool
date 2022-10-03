@@ -284,11 +284,11 @@ def remove_background_thread(src, save_):
 #     get_frames(f, save, value=10)
 
 # Remove background
-files, _ = get_all_file(join(ROOT, "images_processed", "side_process", "backside", "extracted"))
-
-save = join(ROOT, "images_processed", "side_process", "backside", "removed")
-for f in files:
-    remove_background_thread(f,save)
+# files, _ = get_all_file(join(ROOT, "images_processed", "side_process", "backside", "extracted"))
+#
+# save = join(ROOT, "images_processed", "side_process", "backside", "removed")
+# for f in files:
+#     remove_background_thread(f, save)
     # t = threading.Thread(target=remove_background_thread, args=[f, save])
     # t.start()
 
