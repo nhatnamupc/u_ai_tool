@@ -2,13 +2,17 @@
 
 {% block content %}
 <div class="content">
-    <form method="post">
-        <div class="row">
-            <div class="col-sm-4">
-                <button type="submit" class="btn-login" name="btn_control" value="btn_evolve">モデル情報</button>
+    <div class="row">
+        <div class="col-sm-4">
+            <div class="dropdown">
+                <button class="dropbtn">MODEL</button>
+                <div class="dropdown-content">
+                    <a href="#">NSJ_001.pt</a>
+                    <a href="#">NSJ_002.pt</a>
+                    <a href="#">NSJ_003.pt</a>
+                </div>
             </div>
         </div>
-
-    </form>
+    </div>
 </div>
 {% endblock %}

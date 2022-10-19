@@ -9,6 +9,7 @@ import threading
 import csv
 
 from rembg import remove
+import albumentations as A
 
 join = os.path.join
 basename = os.path.basename
@@ -116,7 +117,24 @@ def class_id(file):
     return str(files[0])
 
 
-def bnd_box_to_yolo_line(box, img_size):
+def yolo_box_to_rec_box(box, img_size):
+    x, y, w, h = box
+    x1 = int((x - w / 2) * img_size[1])
+    w1 = int((x + w / 2) * img_size[1])
+    y1 = int((y - h / 2) * img_size[0])
+    h1 = int((y + h / 2) * img_size[0])
+    if x1 < 0:
+        x1 = 0
+    if w1 > img_size[1] - 1:
+        w1 = img_size[1] - 1
+    if y1 < 0:
+        y1 = 0
+    if h1 > img_size[0] - 1:
+        h1 = img_size[0] - 1
+    return x1, y1, w1 - x1, h1 - y1
+
+
+def bnd_box_to_yolo_box(box, img_size):
     (x_min, y_min) = (box[0], box[1])
     (w, h) = (box[2], box[3])
     x_max = x_min + w
@@ -131,13 +149,13 @@ def bnd_box_to_yolo_line(box, img_size):
     return x_center, y_center, w if w < 1 else 1.0, h if h < 1 else 1.0
 
 
-def merge(path_background, path_foreground, annotation_num, save_path, rotate=False, filename="merged"):
+def merge(path_background, path_foreground, annotation_num, save_path, rotate=False, filename="merged_2"):
     """Paste foreground to background """
 
     backgrounds, _ = get_all_file(path_background)  # Get list backgrounds
     foregrounds, _ = get_all_file(path_foreground)  # Get list foregrounds
     dictionary = {}  # ex: {"1": [1,0]}  => [1,0] : 1 annotation value, 0 rotate degree value
-    overlap_value = 3  # Overlap value
+    overlap_value = 10  # Overlap value
     idx = 0  # Image index
     name = "no_name"
     while True:
@@ -162,8 +180,7 @@ def merge(path_background, path_foreground, annotation_num, save_path, rotate=Fa
                     print(f"{id_} finnish")
                     foregrounds.remove(fg)
                     continue
-                dictionary[id_][0] += 1
-            fore_image = Image.open(fg).convert("RGBA")
+            fore_image = Image.open(fg).convert("RGBA")  # Read foreground image with 4 channels
             if rotate:
                 if dictionary[id_][1] > 359:
                     dictionary[id_][1] = 0
@@ -196,7 +213,7 @@ def merge(path_background, path_foreground, annotation_num, save_path, rotate=Fa
             except Exception as e:
                 print(e)
             box = (x, y, fw, fh)
-            yolo_box = bnd_box_to_yolo_line(box, (bh, bw))
+            yolo_box = bnd_box_to_yolo_box(box, (bh, bw))  # Converse Bounding Box(xywh) to Yolo format(xyxy)
             cls = int(id_)
             name = join(save_path, f"{filename}_{idx}")
             with open(name + ".txt", 'a') as f:
@@ -207,7 +224,6 @@ def merge(path_background, path_foreground, annotation_num, save_path, rotate=Fa
 
         if is_write:
             merged_image.save(name + ".png", format="png")
-
         idx += 1
 
 
@@ -277,37 +293,183 @@ def remove_background_thread(src, save_):
     remove_background(src, join(save_f, basename(src)))
 
 
-# Get Frame
-# files, _ = get_all_file(r"C:\NAM\GIT\upc_yolov5_dataset_creator\image_process\video\yakult\2\2_03")
-# save = join(ROOT, "images_processed", "side_process", "backside")
-# for f in files:
-#     get_frames(f, save, value=10)
+def contras_brightness(src, save_light, save_dark, plus_alpha=1.6, minus_alpha=0.8):
+    original_images, _ = get_all_file(src)
+    alpha = 1.5
+    for image in original_images:
+        img = cv2.imread(image, cv2.IMREAD_UNCHANGED)
+        plus_contras, minus_contrast = cv2.convertScaleAbs(img, alpha, plus_alpha), cv2.convertScaleAbs(img, alpha,
+                                                                                                        minus_alpha)
+        cv2.imwrite(join(save_light, basename(image)[:-4] + "_light.png"), plus_contras)
+        cv2.imwrite(join(save_dark, basename(image)[:-4] + "_dark.png"), minus_contrast)
 
-# Remove background
-# files, _ = get_all_file(join(ROOT, "images_processed", "side_process", "backside", "extracted"))
+
+def affine_image(path, save_path):
+    list_file, _ = get_all_file(path)
+    for img in list_file:
+        if img.endswith('png'):
+            im = cv2.imread(img, cv2.IMREAD_UNCHANGED)
+            h, w = im.shape[:2]
+            if h < w:
+                pts1, pts2 = np.float32([[0, 0], [w, 0], [w / 2, h]]), np.float32([[0, h / 2], [w, h / 2], [w / 2, h]])
+                M = cv2.getAffineTransform(pts1, pts2)
+                img_affine = cv2.warpAffine(im, M, (w, h))
+                save = join(save_path, str(basename(img)[:-4]) + '_affine.png')
+                crop = img_affine[0 + int(h / 2):0 + h, 0:0 + w]
+                cv2.imwrite(save, crop)
+            else:
+                pts1, pts2 = np.float32([[0, h / 2], [w, 0], [w, h]]), np.float32(
+                    [[0, h / 2], [w / 2, 0], [w / 2, h / 2]])
+                M = cv2.getAffineTransform(pts1, pts2)
+                img_affine = cv2.warpAffine(im, M, (w, h))
+                save = join(save_path, str(basename(img)[:-4]) + '_affine.png')
+                crop = img_affine[0:0 + h, 0:0 + int(w / 2)]
+                cv2.imwrite(save, crop)
+
+
+def add_plastic_wrap_to_foreground(path_wrap, path_foreground, annotation_num, save_path, rotate=False):
+    wraps, _ = get_all_file(path_wrap)  # Get list wrap plastic
+    foregrounds, _ = get_all_file(path_foreground)  # Get list foregrounds
+    dictionary = {}  # ex: {"1": [1,0]}  => [1,0] : 1 annotation value, 0 rotate degree value
+    overlap_value = 3  # Overlap value
+    idx = 0  # Image index
+    name = "no_name"
+    while True:
+        if len(foregrounds) == 0:
+            break
+        bg_path = random.choice(foregrounds)
+        print(bg_path)
+        id_ = class_id(basename(bg_path))
+        bg = Image.open(bg_path).convert("RGBA")
+        merged_image = bg.copy()
+        bw, bh = merged_image.size  # Get weight height of merge image
+        merged_image = merged_image.resize((bw // 2, bh // 2))
+        bw, bh = merged_image.size  # Get weight height of merge image
+        wrap = random.choice(wraps)
+        wrap_img = Image.open(wrap).convert("RGBA")
+        wrap_w, wrap_h = wrap_img.size
+        ratio = 1
+        if bw < wrap_w and bh < wrap_h:
+            ratio = bw / wrap_w
+        if bw > wrap_w and bh > wrap_h:
+            ratio = wrap_w / bw
+        wrap_img = wrap_img.resize((int(wrap_w * ratio), int(wrap_h * ratio)))
+        print(f"{wrap_img.size} =>> {bg.size}")
+        print(wrap)
+        if id_ not in dictionary:
+            dictionary[id_] = [1, 0]
+        else:
+            if dictionary[id_][0] > annotation_num:
+                print(f"{id_} finnish")
+                foregrounds.remove(bg_path)
+
+        merged_image.paste(wrap_img, (0, 0), wrap_img)
+        if "light" in basename(bg_path):
+            name = join(save_path, f"{basename(bg_path)[:-4]}_light_2_{idx}")
+        elif "dark" in basename(bg_path):
+            name = join(save_path, f"{basename(bg_path)[:-4]}_dark_2_{idx}")
+        is_write = True
+        dictionary[id_][0] += 1
+
+        if is_write:
+            merged_image.save(name + ".png", format="png")
+        idx += 1
+
+
+def create_dataset(dataset_path, images_path, bg_dir):
+    # Init Dataset Directory
+    path_img_train, path_img_valid = join(dataset_path, 'images', 'train'), join(dataset_path, 'images', 'valid')
+    path_lbl_train, path_lbl_valid = join(dataset_path, 'labels', 'train'), join(dataset_path, 'labels', 'valid')
+    os.makedirs(path_img_train, exist_ok=True)
+    os.makedirs(path_img_valid, exist_ok=True)
+    os.makedirs(path_lbl_train, exist_ok=True)
+    os.makedirs(path_lbl_valid, exist_ok=True)
+
+    images, labels = [], []
+    for file in os.listdir(images_path):
+        images.append(file) if file.endswith('png') else labels.append(file)
+
+    num_of_valid = len(images) // 5
+    print(f'Len of images : {len(images)}\nLen of labels : {len(labels)}\nLen valid : {num_of_valid}')
+
+    random_images = []
+    for i in range(0, num_of_valid, 1):
+        while True:
+            img_ran = random.choice(images)
+            if img_ran not in random_images:
+                random_images.append(img_ran[:-4])
+                break
+
+    for img in os.listdir(images_path):
+        # Add valid image and label to Dataset Directory
+        if img[:-4] in random_images:
+            shutil.copy(join(images_path, img), join(path_img_valid, img)) if img.endswith(
+                'png') else shutil.copy(join(images_path, img), join(path_lbl_valid, img))
+
+        # Add train image and label to Dataset Directory
+        else:
+            shutil.copy(join(images_path, img), join(path_img_train, img)) if img.endswith(
+                'png') else shutil.copy(join(images_path, img), join(path_lbl_train, img))
+
+    # Add background image to train dataset
+    for img in os.listdir(bg_dir):
+        shutil.copy(join(bg_dir, img), join(path_img_train, img))
+
+
+def check_annotation(path_check_labels, path_check_train, path_save):
+    files, _ = get_all_file(path_check_labels)
+    index = 0
+
+    for f in files:
+        if basename(f) == "classes.txt":
+            continue
+        elif f.endswith("txt"):
+            if basename(f)[:-4] + ".png" in os.listdir(path_check_train):
+                image = cv2.imread(join(path_check_train, basename(f)[:-4] + ".png"))
+                with open(f, "r", encoding="UTF-8") as txt:
+                    for line in txt:
+                        texts = line.split(" ")
+                        save_f = join(path_save, texts[0])
+                        os.makedirs(save_f, exist_ok=True)
+                        box = (float(texts[1]), float(texts[2]), float(texts[3]), float(texts[4]))
+                        x, y, w, h = yolo_box_to_rec_box(box, image.shape[:2])
+                        crop = image[y:y + h, x:x + w]
+                        index += 1
+                        save_name = basename(f)[:-4] + f"_{index}.png"
+                        cv2.imwrite(join(save_f, save_name), crop)
+            elif basename(f)[:-4] + ".jpg" in os.listdir(path_check_train):
+                image = cv2.imread(join(path_check_train, basename(f)[:-4] + ".jpg"))
+                with open(f, "r", encoding="UTF-8") as txt:
+                    for line in txt:
+                        texts = line.split(" ")
+                        save_f = join(path_save, texts[0])
+                        os.makedirs(save_f, exist_ok=True)
+                        box = (float(texts[1]), float(texts[2]), float(texts[3]), float(texts[4]))
+                        x, y, w, h = yolo_box_to_rec_box(box, image.shape[:2])
+                        crop = image[y:y + h, x:x + w]
+                        index += 1
+                        save_name = basename(f)[:-4] + f"_{index}.png"
+                        cv2.imwrite(join(save_f, save_name), crop)
+            else:
+                continue
+
+
+# Resize
+files, _ = get_all_file(r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\original")
+save = r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\resize"
 #
-# save = join(ROOT, "images_processed", "side_process", "backside", "removed")
-# for f in files:
-#     remove_background_thread(f, save)
-    # t = threading.Thread(target=remove_background_thread, args=[f, save])
-    # t.start()
-
-# Merge function
-# SAVE_PATH = r"\\192.168.0.241\nam\yakult_project\images_processed\top_removed"
-
-# images, _ = get_all_file(join(IMAGE_PROCESS_PATH, "1"))
-# save = join(IMAGE_PROCESS_PATH, "top_process", "merged")
-# fore_path = join(IMAGE_PROCESS_PATH, "top_process", "top_crop")
-# back_path = join(IMAGE_PROCESS_PATH, "background")
-
-# for index in range(0, 50, 5):
-#     t = threading.Thread(target=merge, args=[back_path, fore_path, 5, save, index])
-#     t.start()
-# merge(back_path, fore_path, 100, save, rotate=True, filename="merged_stop")
-# count_annotation(save, "../utils/name.txt", write_to_csv=True)
-
-# for img in images:
-# t = threading.Thread(target=remove_background, args=[img, join(SAVE_PATH, basename(img))])
-# t.start()
-# t = threading.Thread(target=cut_from_removed_background, args=[img, join(SAVE_PATH, basename(img))])
-# t.start()
+# for image in files:
+#     img = cv2.imread(image, cv2.IMREAD_UNCHANGED)
+#     for i in np.arange(0.7, 1.2, 0.1):
+#         img_rs = cv2.resize(img,(0,0), fx=i, fy=i)
+#         for j in range(1,11,1):
+#             cv2.imwrite(join(save, basename(image)[:-4] + f"_rs_{round(i,1)}-{j}.png"), img_rs)
+# transform = A.Compose([
+#     A.Blur(p=0.3),
+# ])
+# img = cv2.imread(
+#     r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\resize\0_03-1_rs_0.7-1.png",
+#     cv2.IMREAD_UNCHANGED)
+#
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()

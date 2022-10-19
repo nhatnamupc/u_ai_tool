@@ -8,39 +8,37 @@
 
 <!--Body-->
 <body>
-<!-- Navbar-->
+<section class="vh-100" style="background-color: white;">
+  <div class="container py-5 h-100">
+    <div class="row d-flex justify-content-center align-items-center h-100">
+      <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+        <div class="card shadow-2-strong" style="border-radius: 1rem;">
+          <div class="card-body p-5 text-center">
 
-<!--Center-->
-<section class="vh-100">
-    <div class="container py-5 h-100">
-        <div class="row d-flex align-items-center justify-content-center h-100">
-            <div class="col-md-8 col-lg-7 col-xl-6">
-                <img src="static/styles/resource/ai.svg" style="float: right;" alt="AI"
-                     class="img-fluid">
-            </div>
-            <div class="col-md-7 col-lg-5 col-xl-5 offset-xl-1">
-                <form method="post" action="/login">
+            <h3 class="mb-5">Sign in</h3>
+
+            <form method="post" action="/login">
                     <!-- Email input -->
                     <div class="form-outline mb-4">
                         <input type="text" placeholder="ユーザー" name="username" value="{{request.form.username }}" class="form-control form-control-lg"/>
                     </div>
-
                     <!-- Password input -->
                     <div class="form-outline mb-4">
                         <input type="password" placeholder="パスワード" name="user_password" value="{{request.form.password }}" class="form-control form-control-lg"/>
                     </div>
-
-                    <button type="submit" class="btn-login" role="button">ログイン</button>
+                    <button type="submit" class="btn btn-lg" style="background-color: teal; color: white;">ログイン</button>
 
                 </form>
                 {% if error %}
                 <p class="error"><strong>Error:</strong> {{ error }}
                     {% endif %}
-            </div>
-        </div>
-    </div>
-</section>
 
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 <!--Footer-->
 </body>
 </html>
