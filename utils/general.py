@@ -2,10 +2,14 @@ import os
 import shutil
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 import random
 import threading
+from utils import images_process as u
+from datetime import datetime
+
 import csv
 
 from rembg import remove
@@ -265,11 +269,10 @@ def count_annotation(path_txt, file_classes_name, write_to_csv=False):
             f1.close()
             for dt in data:
                 cls, x, y, w, h = map(float, dt.split(' '))
-                if cls not in annotation_dic.keys():
-                    annotation_dic[int(cls)] = 1
+                if cls in annotation_dic.keys():
+                    annotation_dic[cls] += 1
                 else:
-
-                    annotation_dic[int(cls)] += 1
+                    annotation_dic[cls] = 1
 
         for index, id_cls in enumerate(names):
             if index not in annotation_dic.keys():
@@ -285,6 +288,7 @@ def count_annotation(path_txt, file_classes_name, write_to_csv=False):
                 writer = csv.writer(f)
                 writer.writerow(header)
                 writer.writerow(data)
+    print(annotation_dic)
 
 
 def remove_background_thread(src, save_):
@@ -454,9 +458,120 @@ def check_annotation(path_check_labels, path_check_train, path_save):
                 continue
 
 
+class MergeThread(threading.Thread):
+    def __init__(self, bgs, fgs, merge_lock, dictionary_id, save_path="", file_name="merged", annotation_num=1,
+                 rotate=False):
+        super(MergeThread, self).__init__()
+        self.annotation_num = annotation_num
+        self.fgs = fgs
+        self.bgs = bgs
+        self.rotate = rotate
+        self.save_path = save_path
+        self.file_name = file_name
+        self.merge_lock = merge_lock
+        self.dictionary_id = dictionary_id
+
+    def run(self):  # Get list foregrounds
+        overlap_value = 10  # Overlap value
+        idx = 0  # Image index
+        name = "no_name"
+        while True:
+            if len(self.fgs) == 0:  # Break when len of list foreground == 0
+                break
+            bg_path = random.choice(self.bgs)  # Random choice one of background in list backgrounds
+            bg = Image.open(bg_path).convert("RGBA")  # Read bg by Image PIL with 4 channels
+            print(f"Processing {basename(bg_path)}")
+            merged_image = bg.copy()
+            bw, bh = merged_image.size  # Get weight height of merge image
+            cur_h, cur_w, max_h, max_w = 0, 0, 0, 0
+            while True:
+                if len(self.fgs) == 0:  # Break when len of list foreground == 0
+                    break
+                fg = random.choice(self.fgs)  # Random choice foreground
+                id_ = class_id(basename(fg))  # Get id of product
+                self.merge_lock.acquire()
+                if str(id_) not in self.dictionary_id.keys():
+                    self.dictionary_id[id_] = [0, 0]
+                self.merge_lock.release()
+                if self.dictionary_id[id_][0] <= self.annotation_num:
+                    fore_image = Image.open(fg).convert("RGBA")  # Read foreground image with 4 channels
+                    if self.rotate:
+                        self.merge_lock.acquire()
+                        if self.dictionary_id[id_][1] > 359:
+                            self.dictionary_id[id_][1] = 0
+                        self.dictionary_id[id_][1] += 20
+                        self.merge_lock.release()
+                        fore_image = fore_image.rotate(self.dictionary_id[id_][1], expand=True)
+                        fore_image = fore_image.crop(w_h_image_rotate(fore_image))
+                    fw, fh = fore_image.size  # Foreground size
+                    if fw > bw or fh > bh:
+                        continue
+                    if max_h < fh:
+                        max_h = fh - overlap_value
+                    if (cur_w + fw) >= bw:
+                        cur_w = 0
+                        cur_h += max_h
+                    if (cur_h + fh) >= bh:
+                        break
+                    x, y = 0, 0
+                    try:
+                        if cur_w > 0:
+                            if cur_h == 0:
+                                merged_image.paste(fore_image, (cur_w - overlap_value, cur_h), fore_image)
+                                x, y = cur_w - overlap_value, cur_h
+                            else:
+                                merged_image.paste(fore_image, (cur_w, cur_h - overlap_value), fore_image)
+                                x, y = cur_w, cur_h - overlap_value
+                        else:
+                            merged_image.paste(fore_image, (cur_w, cur_h), fore_image)
+                            x, y = cur_w, cur_h
+                    except Exception as e:
+                        print(e)
+                    box = (x, y, fw, fh)
+                    yolo_box = bnd_box_to_yolo_box(box, (bh, bw))  # Converse Bounding Box(xywh) to Yolo format(xyxy)
+                    cls = int(id_)
+                    name = join(self.save_path, f"{self.file_name}_{idx}")
+                    with open(name + ".txt", 'a') as f:
+                        f.write(f"{cls} {yolo_box[0]} {yolo_box[1]} {yolo_box[2]} {yolo_box[3]}\n")
+                    cur_w += fw - overlap_value
+                    self.merge_lock.acquire()
+                    self.dictionary_id[id_][0] += 1
+                    self.merge_lock.release()
+                else:
+                    self.merge_lock.acquire()
+                    self.fgs.remove(fg)
+                    self.merge_lock.release()
+                    print(
+                        f" the amount of class '{id_}' is enough. Removed it from foregrounds list. Continue. . .")
+                    continue
+
+            merged_image.save(name + ".png", format="png")
+            idx += 1
+
+
+side_bgs = r"\\192.168.0.241\nam\yakult_project\images_processed\background_1\side_bg"
+fgs_, _ = get_all_file(r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\resize")
+bgs_, _ = get_all_file(r"\\192.168.0.241\nam\yakult_project\images_processed\background_1\side_bg")
+save_ = r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\merged"
+threads = []
+time_ = datetime.now()
+merge_lock_ = threading.Lock()
+dictionary = {}
+for i in range(0, 5, 1):
+    t = MergeThread(fgs=fgs_, bgs=bgs_, merge_lock=merge_lock_, dictionary_id=dictionary, save_path=save_,
+                    annotation_num=50,
+                    file_name=f"merged_{i}")
+    t.start()
+    threads.append(t)
+for t in threads:
+    t.join()
+
+print(f"Total time need :  {datetime.now() - time_}")
+count_annotation(save_, "classes.txt")
+
 # Resize
-files, _ = get_all_file(r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\original")
-save = r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\resize"
+# files_, _ = get_all_file(r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\original")
+# save = r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\resize"
 #
 # for image in files:
 #     img = cv2.imread(image, cv2.IMREAD_UNCHANGED)
@@ -465,11 +580,35 @@ save = r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with
 #         for j in range(1,11,1):
 #             cv2.imwrite(join(save, basename(image)[:-4] + f"_rs_{round(i,1)}-{j}.png"), img_rs)
 # transform = A.Compose([
-#     A.Blur(p=0.3),
+#     # A.Blur(blur_limit=5),
+#     A.RandomBrightnessContrast(p=0.5)
 # ])
-# img = cv2.imread(
+# contras_,_= get_all_file(r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\blur")
+# for f in contras_:
+#     image = cv2.imread(f, cv2.IMREAD_UNCHANGED)
+#     image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGBA)
+#     transformed = transform(image=image)
+#     transformed_image = transformed["image"]
+#     transformed_image = cv2.cvtColor(transformed_image, cv2.COLOR_RGBA2BGRA)
+#     cv2.imwrite(join(r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\brightness",
+#                      basename(f)[:-4] + "_brightness.png"), transformed_image)
+
+# image = cv2.imread(
 #     r"\\192.168.0.241\nam\yakult_project\images_processed\20221019_check_with_parameter\resize\0_03-1_rs_0.7-1.png",
 #     cv2.IMREAD_UNCHANGED)
 #
+# image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGBA)
+# transformed = transform(image=image)
+# transformed_image = transformed["image"]
+# transformed_image = cv2.cvtColor(transformed_image, cv2.COLOR_RGBA2BGRA)
+# cv2.imwrite("d.png", transformed_image)
 # cv2.waitKey(0)
-# cv2.destroyAllWindows()
+# cv2.destroyAllWindow()
+# fixs, _ = get_all_file(r"\\192.168.0.241\nam\yakult_project\images_processed\20221021\fail_image\side")
+# for f in fixs:
+#     dir_, base_ = os.path.split(f)
+#     new_name = base_.replace("top", "side")
+#     old = f
+#     new = join(dir_, new_name)
+#
+#     os.rename(old, new)

@@ -1,6 +1,9 @@
-dic = [str(cls) for cls in range(0, 21, 1)]
-print(dic)
+# dic = [str(cls) for cls in range(0, 21, 1)]
+# print(dic)
 import os.path
+import random
+import time
+
 from utils import general
 import cv2
 import shutil
@@ -64,3 +67,30 @@ for index, cls in enumerate(old_cls_top):
 #     cv2.imwrite(join(save, os.path.basename(f)[:-4] + "_square.png"), padded_img)
 #     old, new = f, join(r"\\192.168.0.241\nam\yakult_project\20221005_data\square", "images", os.path.basename(f))
 #     shutil.copy(old, new)
+
+import threading
+from datetime import datetime
+
+class MyThread(threading.Thread):
+    def __init__(self, id_,A_):
+        super().__init__()
+        self.id = id_
+        self.A_=A_
+
+    def run(self):
+        th_lock.acquire()
+        self.A_.pop(0)
+        print(f"Thread {self.id} : {A}")
+        th_lock.release()
+
+
+th_lock=threading.Lock()
+A = [1,2,3,4,5]
+t1 = MyThread(1,A)
+t2 = MyThread(2,A)
+time=datetime.now()
+t1.start()
+t2.start()
+t1.join()
+t2.join()
+print(datetime.now()-time)
